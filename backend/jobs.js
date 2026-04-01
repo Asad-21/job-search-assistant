@@ -21,6 +21,8 @@ async function fetchAdzunaJobs() {
               what: query,
               where: "India",
               content_type: "application/json",
+              sort_by: "date",
+              max_days_old: 2,
             },
           }
         );
@@ -109,7 +111,7 @@ async function fetchLinkedInJobs() {
     try {
       const searchUrl =
         `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search` +
-        `?keywords=${encodeURIComponent(query)}&location=India&start=0`;
+        `?keywords=${encodeURIComponent(query)}&location=India&start=0&sortBy=R`;
 
       const searchRes = await axios.get(searchUrl, { headers });
 
@@ -189,18 +191,20 @@ async function fetchLinkedInPosts() {
   for (const keyword of config.postKeywords) {
     try {
       const runRes = await axios.post(
-        `https://api.apify.com/v2/acts/curious_coder~linkedin-post-search-scraper/runs?token=${APIFY_API_TOKEN}`,
+        `https://api.apify.com/v2/acts/harvestapi~linkedin-post-search/runs?token=${APIFY_API_TOKEN}`,
         {
-          searchUrl:
-            `https://www.linkedin.com/search/results/content/` +
-            `?keywords=${encodeURIComponent(keyword)}&sortBy=date_posted`,
-          maxResults: 10,
+          searchQueries: [keyword],
+          maxPosts: 20,
+          sortBy: "date_posted",
+          scrapeReactions: false,
+          scrapeComments: false,
         }
       );
 
       const runId = runRes.data.data.id;
       console.log(`Apify: started run ${runId} for "${keyword}"`);
 
+      // Poll until complete
       let status = "RUNNING";
       while (status === "RUNNING" || status === "READY") {
         await new Promise((r) => setTimeout(r, 3000));
@@ -210,16 +214,17 @@ async function fetchLinkedInPosts() {
         status = statusRes.data.data.status;
       }
 
+      // Fetch results
       const resultsRes = await axios.get(
         `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_API_TOKEN}`
       );
 
       const posts = resultsRes.data.map((post) => ({
-        title: `Post by ${post.author?.name || "Unknown"}: ${post.text?.slice(0, 60) || ""}...`,
-        company: post.author?.headline || "LinkedIn Post",
+        title: `Post by ${post.author?.name || "Unknown"}: ${post.content?.slice(0, 60) || ""}...`,
+        company: post.author?.info || "LinkedIn Post",
         location: "LinkedIn",
-        description: post.text?.slice(0, 1500) || "",
-        url: post.postUrl || "",
+        description: post.content?.slice(0, 1500) || "",
+        url: post.linkedinUrl || "",
         source: "LinkedIn Post",
       }));
 
@@ -232,7 +237,6 @@ async function fetchLinkedInPosts() {
 
   return allPosts;
 }
-
 // ─── Main export ───────────────────────────────────────────────────────────
 
 async function fetchAllJobs() {
