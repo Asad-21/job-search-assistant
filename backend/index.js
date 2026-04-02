@@ -173,6 +173,19 @@ app.post("/jobs/:id/send-email", async (req, res) => {
   }
 });
 
+app.get("/test-hunter", async (req, res) => {
+  const company = req.query.company;
+  if (!company) {
+    return res.status(400).json({ error: "Pass ?company=CompanyName" });
+  }
+  try {
+    const result = await findDecisionMaker(company, "");
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Start server ──────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3001;

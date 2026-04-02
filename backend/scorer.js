@@ -52,6 +52,7 @@ Description:
 ${sanitise(job.description) || "No description available."}
 
 INSTRUCTIONS
+Each criterion score must not exceed its maximum weight. Never give more than the maximum points for any criterion.
 Return ONLY a JSON object. No explanation outside the JSON. No markdown fences.
 The JSON must have exactly these fields:
 
@@ -59,11 +60,11 @@ The JSON must have exactly these fields:
   "score": <integer 0-100>,
   "label": <one of: "Strong Match" | "Good Match" | "Weak Match" | "Poor Match">,
   "breakdown": {
-    "roleFit": <integer 0-35>,
-    "companyProfile": <integer 0-25>,
-    "impactAndOwnership": <integer 0-20>,
-    "locationFit": <integer 0-10>,
-    "toolsAndSkillMatch": <integer 0-10>
+    "roleFit": <integer 0-35, never exceed 35>,
+    "companyProfile": <integer 0-25, never exceed 25>,
+    "impactAndOwnership": <integer 0-20, never exceed 20>,
+    "locationFit": <integer 0-10, never exceed 10>,
+    "toolsAndSkillMatch": <integer 0-5, never exceed 5>
   },
   "reason": "<2-3 sentence plain English explanation of why this scored the way it did>",
   "redFlags": "<one sentence on any concerns, or None if no concerns>",

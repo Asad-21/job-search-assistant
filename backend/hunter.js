@@ -1,15 +1,16 @@
 const axios = require("axios");
 
 // ─── Hunter.io — Find decision maker email ─────────────────────────────────
-// Only called when user clicks "Draft Email" on a job card.
-// Searches for founders, CEOs, CTOs, VPs — not HR or recruiters.
-// Free tier: 25 searches/month.
+// Called when user clicks "Draft Email" on a job card.
+// Finds the most senior non-HR contact at the company.
+// Free tier: 25 searches/month — one call per company lookup.
 
 const SKIP_TITLES = [
   "recruiter",
   "talent acquisition",
   "human resources",
   "hr ",
+  " hr",
   "people ops",
   "people operations",
   "sourcer",
@@ -25,7 +26,6 @@ function scoreContact(email) {
   const isSkip = SKIP_TITLES.some((t) => title.includes(t));
   if (isSkip) return -1;
 
-  // Score by seniority
   let score = 0;
   if (title.includes("founder") || title.includes("ceo")) score = 100;
   else if (title.includes("cto") || title.includes("coo")) score = 90;
@@ -43,7 +43,7 @@ function scoreContact(email) {
   return score;
 }
 
-// ─── Process a list of emails into a ranked result ─────────────────────────
+// ─── Process emails into ranked result ────────────────────────────────────
 
 function processEmails(emails, domain) {
   const scored = emails
@@ -60,6 +60,8 @@ function processEmails(emails, domain) {
   }
 
   const best = scored[0];
+  console.log(`Hunter: best contact — ${best.first_name} ${best.last_name} (${best.position}) <${best.value}> [${best.confidence}% confidence]`);
+
   return {
     found: true,
     domain,
@@ -77,9 +79,9 @@ function processEmails(emails, domain) {
   };
 }
 
-// ─── Search emails at a domain ─────────────────────────────────────────────
+// ─── Fallback: search by domain directly ──────────────────────────────────
 
-async function searchEmails(domain) {
+async function searchByDomain(domain) {
   const { HUNTER_API_KEY } = process.env;
 
   try {
@@ -93,35 +95,10 @@ async function searchEmails(domain) {
         },
       }
     );
-
     return response.data?.data?.emails || [];
   } catch (err) {
-    console.error(`Hunter email search error for "${domain}":`, err.message);
+    console.error(`Hunter domain search error for "${domain}":`, err.message);
     return [];
-  }
-}
-
-// ─── Find company domain via Hunter ────────────────────────────────────────
-
-async function findCompanyDomain(companyName) {
-  const { HUNTER_API_KEY } = process.env;
-
-  try {
-    const response = await axios.get(
-      "https://api.hunter.io/v2/domain-search",
-      {
-        params: {
-          company: companyName,
-          api_key: HUNTER_API_KEY,
-          limit: 1,
-        },
-      }
-    );
-
-    return response.data?.data?.domain || null;
-  } catch (err) {
-    console.error(`Hunter domain search error for "${companyName}":`, err.message);
-    return null;
   }
 }
 
@@ -137,44 +114,69 @@ function guessDomain(companyName) {
   );
 }
 
-// ─── Main function — find best contact for a company ──────────────────────
+// ─── Main function ─────────────────────────────────────────────────────────
 
 async function findDecisionMaker(companyName, jobTitle) {
-  console.log(`Hunter: searching for decision maker at "${companyName}"`);
+  const { HUNTER_API_KEY } = process.env;
 
-  // Step 1 — find domain via Hunter
-  let domain = await findCompanyDomain(companyName);
+  // Debug: confirm key is loaded
+  console.log(`Hunter: key loaded? ${HUNTER_API_KEY ? "YES (" + HUNTER_API_KEY.slice(0, 6) + "...)" : "NOT FOUND"}`);
 
-  // Step 2 — fallback: guess domain from company name
-  if (!domain) {
-    const guessed = guessDomain(companyName);
-    console.log(`Hunter: domain not found, guessing "${guessed}"`);
+  // Sanitise company name
+  const cleanName = companyName
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\(.*?\)/g, "")
+    .trim();
 
-    const guessedEmails = await searchEmails(guessed);
-    if (guessedEmails.length) {
-      console.log(`Hunter: found ${guessedEmails.length} emails at guessed domain ${guessed}`);
-      return processEmails(guessedEmails, guessed);
+  console.log(`Hunter: searching for "${cleanName}"`);
+
+  try {
+    // Single API call — gets domain AND emails together
+    const response = await axios.get(
+      "https://api.hunter.io/v2/domain-search",
+      {
+        params: {
+          company: cleanName,
+          api_key: HUNTER_API_KEY,
+          limit: 10,
+        },
+      }
+    );
+
+    const data = response.data?.data;
+
+    if (!data?.domain) {
+      console.log(`Hunter: no domain found for "${cleanName}", trying domain guess`);
+      const guessed = guessDomain(cleanName);
+      console.log(`Hunter: guessing domain as "${guessed}"`);
+      const emails = await searchByDomain(guessed);
+      if (emails.length) return processEmails(emails, guessed);
+      return { found: false, reason: "Company not found in Hunter database" };
     }
 
-    return {
-      found: false,
-      reason: "Company not found in Hunter database",
-    };
+    const emails = data.emails || [];
+    console.log(`Hunter: found domain ${data.domain} with ${emails.length} contacts`);
+
+    if (!emails.length) {
+      return {
+        found: false,
+        domain: data.domain,
+        reason: "No email contacts found at this domain",
+      };
+    }
+
+    return processEmails(emails, data.domain);
+
+  } catch (err) {
+    console.error(`Hunter error:`, err.message);
+    if (err.response) {
+      console.error(`Hunter response status:`, err.response.status);
+      console.error(`Hunter response data:`, JSON.stringify(err.response.data));
+    }
+    return { found: false, reason: "Hunter API error: " + err.message };
   }
-
-  console.log(`Hunter: found domain ${domain}`);
-
-  // Step 3 — search emails at domain
-  const emails = await searchEmails(domain);
-  if (!emails.length) {
-    return {
-      found: false,
-      domain,
-      reason: "No emails found at this domain",
-    };
-  }
-
-  return processEmails(emails, domain);
 }
 
 module.exports = { findDecisionMaker };
