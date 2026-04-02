@@ -80,18 +80,40 @@ export default function App() {
   }
 
   async function openEmailModal(job) {
-    setEmailModal({ job, subject: "", body: "", ready: false });
-    setEmailLoading(true);
-    setRecipient("");
-    try {
-      const res = await axios.post(`${API}/jobs/${job.id}/preview-email`, { job });
-      setEmailModal({ job, subject: res.data.subject, body: res.data.body, ready: true });
-    } catch (e) {
-      showToast("Email preview failed", "error");
-      setEmailModal(null);
-    }
-    setEmailLoading(false);
+  setEmailModal({ job, subject: "", body: "", ready: false, hunterInfo: null });
+  setEmailLoading(true);
+  setRecipient("");
+
+  // Run Hunter and email generation in parallel
+  const [hunterRes, emailRes] = await Promise.allSettled([
+    axios.post(`${API}/jobs/${job.id}/find-contact`, {
+      company: job.company,
+      title: job.title,
+    }),
+    axios.post(`${API}/jobs/${job.id}/preview-email`, { job }),
+  ]);
+
+  // Pre-populate recipient if Hunter found someone
+  if (hunterRes.status === "fulfilled" && hunterRes.value.data.found) {
+    setRecipient(hunterRes.value.data.email);
   }
+
+  // Set email content
+  if (emailRes.status === "fulfilled") {
+    setEmailModal({
+      job,
+      subject: emailRes.value.data.subject,
+      body: emailRes.value.data.body,
+      ready: true,
+      hunterInfo: hunterRes.status === "fulfilled" ? hunterRes.value.data : null,
+    });
+  } else {
+    showToast("Email preview failed", "error");
+    setEmailModal(null);
+  }
+
+  setEmailLoading(false);
+}
 
   async function sendEmail() {
     if (!recipient) { showToast("Enter recipient email", "error"); return; }
@@ -242,14 +264,39 @@ export default function App() {
                   />
                 </div>
                 <div className="modal__field">
-                  <label>Send To</label>
-                  <input
-                    className="modal__input"
-                    placeholder="hiring@company.com"
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                  />
-                </div>
+  <label>Send To</label>
+  {emailModal?.hunterInfo?.found && (
+    <div style={{
+      fontFamily: "var(--mono)",
+      fontSize: "11px",
+      color: "var(--green)",
+      marginBottom: "6px",
+    }}>
+      Hunter found: {emailModal.hunterInfo.position} — {emailModal.hunterInfo.confidence}% confidence
+      {emailModal.hunterInfo.allContacts?.length > 1 && (
+        <span style={{ color: "var(--muted)", marginLeft: "8px" }}>
+          ({emailModal.hunterInfo.allContacts.length} contacts found)
+        </span>
+      )}
+    </div>
+  )}
+  {emailModal?.hunterInfo?.found === false && (
+    <div style={{
+      fontFamily: "var(--mono)",
+      fontSize: "11px",
+      color: "var(--yellow)",
+      marginBottom: "6px",
+    }}>
+      Hunter: {emailModal.hunterInfo.reason} — enter email manually
+    </div>
+  )}
+  <input
+    className="modal__input"
+    placeholder="hiring@company.com"
+    value={recipient}
+    onChange={(e) => setRecipient(e.target.value)}
+  />
+</div>
                 <div className="modal__actions">
                   <button className="btn btn--ghost" onClick={() => setEmailModal(null)}>Cancel</button>
                   <button className="btn btn--send" onClick={sendEmail} disabled={sending}>

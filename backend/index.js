@@ -1,9 +1,11 @@
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { fetchAllJobs } = require("./jobs");
 const { scoreAllJobs } = require("./scorer");
 const { saveAllJobs, getAllJobs, updateJobStatus } = require("./airtable");
+const { findDecisionMaker } = require("./hunter");
 const { sendOutreachEmail, previewEmail } = require("./gmail");
 
 const app = express();
@@ -46,12 +48,12 @@ app.post("/run", async (req, res) => {
     console.log(`Fetched ${rawJobs.length} raw jobs`);
 
     //Step 2: Score
-    const scoredJobs = await scoreAllJobs(rawJobs);
-    console.log(`Scored ${scoredJobs.length} jobs`);
+   // const scoredJobs = await scoreAllJobs(rawJobs);
+    //console.log(`Scored ${scoredJobs.length} jobs`);
 
     // Step 3: Save
-    const saved = await saveAllJobs(scoredJobs);
-    console.log(`Saved ${saved} new jobs to Airtable`);
+    //const saved = await saveAllJobs(scoredJobs);
+    //console.log(`Saved ${saved} new jobs to Airtable`);
 
     console.log("=== Pipeline run complete ===");
 
@@ -118,6 +120,23 @@ app.post("/jobs/:id/preview-email", async (req, res) => {
     res.json({ success: true, ...email });
   } catch (err) {
     console.error("/preview-email error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /jobs/:id/find-contact ──────────────────────────────────────────
+app.post("/jobs/:id/find-contact", async (req, res) => {
+  const { company, title } = req.body;
+
+  if (!company) {
+    return res.status(400).json({ success: false, error: "Company name required" });
+  }
+
+  try {
+    const result = await findDecisionMaker(company, title);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error("/find-contact error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
