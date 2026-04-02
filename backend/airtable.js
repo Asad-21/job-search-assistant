@@ -58,9 +58,23 @@ async function saveAllJobs(jobs) {
   // Fetch existing URLs from Airtable to avoid duplicates
   const existing = await getExistingURLs();
   console.log(`Airtable: ${existing.size} jobs already in database`);
+  
+ // DEBUG — trace Leena AI through save logic
+  const leenaJobs = jobs.filter(j => 
+    j.title?.toLowerCase().includes("entrepreneur in residence (eir)")
+  );
+  console.log(`DEBUG SAVE: Found ${leenaJobs.length} EIR jobs to check`);
+  leenaJobs.forEach(j => {
+    console.log(`DEBUG SAVE: "${j.title}" | company: "${j.company}" | score: ${j.score} | url: ${j.url}`);
+    console.log(`DEBUG SAVE: url in existing? ${existing.has(j.url)}`);
+    console.log(`DEBUG SAVE: score >= 0? ${j.score >= 0}`);
+    console.log(`DEBUG SAVE: has url? ${!!j.url}`);
+  });   
+
+  
 
   const newJobs = jobs.filter((job) =>
-  job.url && !existing.has(job.url) && job.score > 10
+  job.url && !existing.has(job.url) && job.score >= 20
 );
   console.log(`Airtable: ${newJobs.length} new jobs to save`);
 

@@ -4,6 +4,13 @@ const config = require("./config");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ─── Candidate meta ────────────────────────────────────────────────────────
+const CANDIDATE = {
+  name: "Asad Mansuri",
+  linkedin: "https://www.linkedin.com/in/asad-mansuri/",
+  cv: "https://drive.google.com/file/d/1twilFZvsSgpUb9nz4Gy8M30w4JQUubUS/view?usp=sharing",
+};
+
 // ─── Initialise Gmail transporter ─────────────────────────────────────────
 
 function getTransporter() {
@@ -20,31 +27,46 @@ function getTransporter() {
 
 async function generateEmail(job) {
   const prompt = `
-You are helping a job seeker write a cold outreach email for a role they are interested in.
+You are writing a cold outreach email for Asad Mansuri, a job seeker.
 
-─── CANDIDATE PROFILE ────────────────────────────────────────────────────────
+CANDIDATE PROFILE
 ${config.candidateProfile}
 
-─── JOB DETAILS ──────────────────────────────────────────────────────────────
+JOB DETAILS
 Title: ${job.title}
 Company: ${job.company}
 Location: ${job.location}
+Score reason: ${job.reason || "Strong role and company fit"}
 Description:
 ${job.description || "No description available."}
 
-─── INSTRUCTIONS ─────────────────────────────────────────────────────────────
-Write a short, sharp cold outreach email from Asad to the hiring team at ${job.company}.
+INSTRUCTIONS
+Write a cold outreach email from Asad to the hiring team at ${job.company}.
 
-Rules:
-- Subject line should be specific to the role, not generic
-- Max 150 words in the body
-- Do not use phrases like "I hope this email finds you well"
-- Lead with one specific thing about the company or role that excited Asad
-- Mention 1–2 directly relevant achievements from his profile (use real numbers)
-- End with a single clear ask: a 20-minute call
-- Tone: confident, direct, founder-friendly — not corporate or sycophantic
+Hard rules:
+- Subject line: specific and direct, reference the role and company, no buzzwords
+- Body: 80-100 words maximum, no exceptions
+- Opening line: Lead with what Asad brings that is directly relevant to THIS specific role. Reference his most relevant experience. Do NOT comment on the company, their product, or their market. Start with Asad, not them.
+- Never use em dashes (—) anywhere
+- Never use bullet points or dashes of any kind — write in short prose paragraphs only
+- Never use: "hope this finds you well", "passionate", "excited to", "I came across", "agentic", "autonomous", "copilot", or any phrase that sounds like it was written by AI
+- Tone: direct, first-person, like a founder talking to another founder
+- Mention exactly 1 achievement with a real number from his profile
+- End with a single clear ask for a 20-minute call
+- Sign off with exactly these details on separate lines, no changes:
 
-Return ONLY a JSON object. No markdown fences. Exactly these fields:
+Best,
+Asad Mansuri
+LinkedIn: https://www.linkedin.com/in/asad-mansuri/
+Email: asadmansuri219@gmail.com
+Phone: +91 9265153793
+CV: https://drive.google.com/file/d/1twilFZvsSgpUb9nz4Gy8M30w4JQUubUS/view?usp=sharing
+//LinkedIn: ${CANDIDATE.linkedin}
+//Email: ${process.env.GMAIL_USER}
+//Phone: +91 9265153793
+//CV: ${CANDIDATE.cv}
+
+Return ONLY a JSON object. No markdown fences. No explanation. Exactly these fields:
 {
   "subject": "<email subject line>",
   "body": "<full email body with line breaks as \\n>"
@@ -54,7 +76,7 @@ Return ONLY a JSON object. No markdown fences. Exactly these fields:
   try {
     const response = await client.messages.create({
       model: "claude-opus-4-5",
-      max_tokens: 500,
+      max_tokens: 800,
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -68,8 +90,8 @@ Return ONLY a JSON object. No markdown fences. Exactly these fields:
   } catch (err) {
     console.error(`Email generation error for "${job.title}":`, err.message);
     return {
-      subject: `Interest in ${job.title} at ${job.company}`,
-      body: `Hi,\n\nI came across the ${job.title} role at ${job.company} and would love to connect.\n\nBest,\nAsad`,
+      subject: `${job.title} at ${job.company} — Asad Mansuri`,
+      body: `Hi,\n\nI wanted to reach out about the ${job.title} role at ${job.company}.\n\nI'm currently in the Founder's Office at Loop Health, where I've led GTM strategy and built AI-enabled operational systems. Before that, 3 years in strategy consulting at YCP India.\n\nWould love 20 minutes to explore if there's a fit.\n\nAsad Mansuri\nLinkedIn: ${CANDIDATE.linkedin}\nCV: ${CANDIDATE.cv}`,
     };
   }
 }
@@ -79,7 +101,6 @@ Return ONLY a JSON object. No markdown fences. Exactly these fields:
 async function sendOutreachEmail(job, recipientEmail) {
   const transporter = getTransporter();
 
-  // Generate personalised email with Claude
   console.log(`Generating email for "${job.title}" at ${job.company}...`);
   const email = await generateEmail(job);
 
@@ -113,7 +134,6 @@ async function sendOutreachEmail(job, recipientEmail) {
 }
 
 // ─── Preview email without sending ────────────────────────────────────────
-// Called from the dashboard "Preview" button before committing to send.
 
 async function previewEmail(job) {
   console.log(`Previewing email for "${job.title}" at ${job.company}...`);

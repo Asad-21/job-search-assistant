@@ -10,10 +10,9 @@ const config = {
     "EIR",
     "Founder's Office",
     "Chief of Staff",
-    "Growth Strategy",
-    "RevOps",
-    "GTM Strategy",
-    "Strategy and Operations",
+    //"Growth Strategy",
+    //"RevOps",
+    //"GTM Strategy",
     "Growth Manager",
   ],
 
@@ -22,19 +21,19 @@ const config = {
     "hiring founder office India",
     "hiring EIR startup India",
     "hiring chief of staff startup India",
-    "hiring Strategy & Operations India",
+    //"hiring Strategy & Operations India",
   ],
 
   // ── Location config ───────────────────────────────────────────────────────
   locationConfig: {
     preferred: [
       "bangalore", "bengaluru", "delhi", "ncr",
-      "gurgaon", "gurugram", "mumbai", "remote",
-      "pan india", "pan-india", "anywhere", "hybrid",
+      "gurgaon", "gurugram", "mumbai", "remote", "noida",
+      "pan india", "pan-india", "anywhere", "hybrid", "thane"
     ],
     rejectIfMentioned: [
-      "dubai", "singapore", "london", "new york",
-      "us only", "uae", "germany", "australia",
+      "dubai", "singapore", "london", "new york", "pune", "ahmedabad",
+      "us only", "uae", "germany", "australia", "chennai", "jaipur",
     ],
   },
 
@@ -53,7 +52,7 @@ const config = {
         "How well does the role match Founder's Office, EIR, GTM, RevOps, or Growth strategy? Roles with titles like EIR or Entrepreneur in Residence score highest.",
     },
     companyProfile: {
-      weight: 25,
+      weight: 30,
       description:
         "Prefer AI-first or SaaS companies at Series B or Series C stage. Penalise large MNCs and services firms, and very early pre-seed startups with no product.",
     },
@@ -68,7 +67,7 @@ const config = {
         "Prefer Bangalore, remote, or pan-India roles. Penalise roles requiring international relocation.",
     },
     toolsAndSkillMatch: {
-      weight: 10,
+      weight: 5,
       description:
         "Does the JD mention AI-native, CRM, Salesforce, n8n, SQL, GTM tooling, or growth experimentation? Bonus for any mention of AI-powered operations.",
     },
@@ -106,6 +105,10 @@ const config = {
     Asad Mansuri — IIT Bombay Chemical Engineering graduate (2021).
     Currently at Loop Health in the Founder's Office, working on Growth and GTM strategy.
     Previous: Associate at YCP India (strategy consulting) for 3 years.
+    Has experience building AI-enabled operational tooling and automating workflows
+    using n8n. Built and scaled operations at a health-tech startup. Comfortable
+    working in ambiguous 0-to-1 environments with direct founder exposure.
+    Interested in roles at the intersection of AI, Agentic AI, SaaS, and enterprise growth
     Key experience: GTM strategy, RevOps, CRM marketing, Salesforce, n8n automation,
     account management, product-led growth, financial modelling, and operations.
     Seeking: EIR, Chief of Staff, Founder's Office, GTM Lead, RevOps, or Growth roles at

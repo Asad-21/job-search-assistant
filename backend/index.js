@@ -45,7 +45,7 @@ app.post("/run", async (req, res) => {
     const rawJobs = await fetchAllJobs();
     console.log(`Fetched ${rawJobs.length} raw jobs`);
 
-    // Step 2: Score
+    //Step 2: Score
     const scoredJobs = await scoreAllJobs(rawJobs);
     console.log(`Scored ${scoredJobs.length} jobs`);
 
