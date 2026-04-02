@@ -5,24 +5,6 @@ const axios = require("axios");
 // Searches for founders, CEOs, CTOs, VPs — not HR or recruiters.
 // Free tier: 25 searches/month.
 
-const DECISION_MAKER_TITLES = [
-  "founder",
-  "co-founder",
-  "ceo",
-  "chief executive",
-  "cto",
-  "chief technology",
-  "coo",
-  "chief operating",
-  "president",
-  "vp",
-  "vice president",
-  "head of",
-  "director",
-  "partner",
-  "general manager",
-];
-
 const SKIP_TITLES = [
   "recruiter",
   "talent acquisition",
@@ -34,31 +16,68 @@ const SKIP_TITLES = [
   "staffing",
 ];
 
-// ─── Extract domain from company name or URL ───────────────────────────────
+// ─── Score a contact by seniority ─────────────────────────────────────────
 
-async function findCompanyDomain(companyName) {
-  const { HUNTER_API_KEY } = process.env;
+function scoreContact(email) {
+  const title = (email.position || "").toLowerCase();
 
-  try {
-    const response = await axios.get(
-      "https://api.hunter.io/v2/domain-search",
-      {
-        params: {
-          company: companyName,
-          api_key: HUNTER_API_KEY,
-          limit: 1,
-        },
-      }
-    );
+  // Skip HR/recruiters entirely
+  const isSkip = SKIP_TITLES.some((t) => title.includes(t));
+  if (isSkip) return -1;
 
-    return response.data?.data?.domain || null;
-  } catch (err) {
-    console.error(`Hunter domain search error for "${companyName}":`, err.message);
-    return null;
-  }
+  // Score by seniority
+  let score = 0;
+  if (title.includes("founder") || title.includes("ceo")) score = 100;
+  else if (title.includes("cto") || title.includes("coo")) score = 90;
+  else if (title.includes("president") || title.includes("partner")) score = 80;
+  else if (title.includes("vp") || title.includes("vice president")) score = 70;
+  else if (title.includes("head of")) score = 60;
+  else if (title.includes("director")) score = 50;
+  else if (title.includes("general manager")) score = 40;
+  else score = 10;
+
+  // Boost verified emails
+  if (email.confidence >= 90) score += 10;
+  else if (email.confidence >= 70) score += 5;
+
+  return score;
 }
 
-// ─── Search for decision makers at a domain ────────────────────────────────
+// ─── Process a list of emails into a ranked result ─────────────────────────
+
+function processEmails(emails, domain) {
+  const scored = emails
+    .map((e) => ({ ...e, _score: scoreContact(e) }))
+    .filter((e) => e._score >= 0)
+    .sort((a, b) => b._score - a._score);
+
+  if (!scored.length) {
+    return {
+      found: false,
+      domain,
+      reason: "Only HR or recruiter contacts found",
+    };
+  }
+
+  const best = scored[0];
+  return {
+    found: true,
+    domain,
+    email: best.value,
+    firstName: best.first_name || "",
+    lastName: best.last_name || "",
+    position: best.position || "",
+    confidence: best.confidence || 0,
+    allContacts: scored.slice(0, 3).map((e) => ({
+      email: e.value,
+      name: `${e.first_name || ""} ${e.last_name || ""}`.trim(),
+      position: e.position || "Unknown",
+      confidence: e.confidence || 0,
+    })),
+  };
+}
+
+// ─── Search emails at a domain ─────────────────────────────────────────────
 
 async function searchEmails(domain) {
   const { HUNTER_API_KEY } = process.env;
@@ -82,31 +101,40 @@ async function searchEmails(domain) {
   }
 }
 
-// ─── Score a contact by seniority ─────────────────────────────────────────
+// ─── Find company domain via Hunter ────────────────────────────────────────
 
-function scoreContact(email) {
-  const title = (email.position || "").toLowerCase();
+async function findCompanyDomain(companyName) {
+  const { HUNTER_API_KEY } = process.env;
 
-  // Skip HR/recruiters entirely
-  const isSkip = SKIP_TITLES.some((t) => title.includes(t));
-  if (isSkip) return -1;
+  try {
+    const response = await axios.get(
+      "https://api.hunter.io/v2/domain-search",
+      {
+        params: {
+          company: companyName,
+          api_key: HUNTER_API_KEY,
+          limit: 1,
+        },
+      }
+    );
 
-  // Score by seniority
-  let score = 0;
-  if (title.includes("founder") || title.includes("ceo")) score = 100;
-  else if (title.includes("cto") || title.includes("coo")) score = 90;
-  else if (title.includes("president") || title.includes("partner")) score = 80;
-  else if (title.includes("vp") || title.includes("vice president")) score = 70;
-  else if (title.includes("head of")) score = 60;
-  else if (title.includes("director")) score = 50;
-  else if (title.includes("general manager")) score = 40;
-  else score = 10; // unknown title — keep as last resort
+    return response.data?.data?.domain || null;
+  } catch (err) {
+    console.error(`Hunter domain search error for "${companyName}":`, err.message);
+    return null;
+  }
+}
 
-  // Boost verified emails
-  if (email.confidence >= 90) score += 10;
-  else if (email.confidence >= 70) score += 5;
+// ─── Guess domain from company name ────────────────────────────────────────
 
-  return score;
+function guessDomain(companyName) {
+  return (
+    companyName
+      .toLowerCase()
+      .replace(/\s+(inc|ltd|llc|pvt|private|limited|technologies|tech|solutions|ai|labs)\.?$/i, "")
+      .replace(/[^a-z0-9]/g, "")
+      .trim() + ".com"
+  );
 }
 
 // ─── Main function — find best contact for a company ──────────────────────
@@ -114,57 +142,39 @@ function scoreContact(email) {
 async function findDecisionMaker(companyName, jobTitle) {
   console.log(`Hunter: searching for decision maker at "${companyName}"`);
 
-  // Step 1 — find domain
-  const domain = await findCompanyDomain(companyName);
+  // Step 1 — find domain via Hunter
+  let domain = await findCompanyDomain(companyName);
+
+  // Step 2 — fallback: guess domain from company name
   if (!domain) {
-    console.log(`Hunter: could not find domain for "${companyName}"`);
-    return { found: false, reason: "Could not find company domain" };
+    const guessed = guessDomain(companyName);
+    console.log(`Hunter: domain not found, guessing "${guessed}"`);
+
+    const guessedEmails = await searchEmails(guessed);
+    if (guessedEmails.length) {
+      console.log(`Hunter: found ${guessedEmails.length} emails at guessed domain ${guessed}`);
+      return processEmails(guessedEmails, guessed);
+    }
+
+    return {
+      found: false,
+      reason: "Company not found in Hunter database",
+    };
   }
 
   console.log(`Hunter: found domain ${domain}`);
 
-  // Step 2 — search emails at domain
+  // Step 3 — search emails at domain
   const emails = await searchEmails(domain);
   if (!emails.length) {
-    console.log(`Hunter: no emails found at ${domain}`);
-    return { found: false, domain, reason: "No emails found at this domain" };
-  }
-
-  // Step 3 — score and rank contacts
-  const scored = emails
-    .map((e) => ({ ...e, _score: scoreContact(e) }))
-    .filter((e) => e._score >= 0) // remove HR/recruiters
-    .sort((a, b) => b._score - a._score);
-
-  if (!scored.length) {
     return {
       found: false,
       domain,
-      reason: "Only HR/recruiter contacts found — not suitable for cold outreach",
+      reason: "No emails found at this domain",
     };
   }
 
-  const best = scored[0];
-
-  console.log(
-    `Hunter: best contact — ${best.first_name} ${best.last_name} (${best.position}) at ${best.value} [confidence: ${best.confidence}%]`
-  );
-
-  return {
-    found: true,
-    domain,
-    email: best.value,
-    firstName: best.first_name || "",
-    lastName: best.last_name || "",
-    position: best.position || "",
-    confidence: best.confidence || 0,
-    allContacts: scored.slice(0, 3).map((e) => ({
-      email: e.value,
-      name: `${e.first_name || ""} ${e.last_name || ""}`.trim(),
-      position: e.position || "Unknown",
-      confidence: e.confidence || 0,
-    })),
-  };
+  return processEmails(emails, domain);
 }
 
 module.exports = { findDecisionMaker };
