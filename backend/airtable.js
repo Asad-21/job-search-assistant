@@ -17,8 +17,12 @@ async function saveJob(job) {
 
   try {
     const record = await table.create({
-      "Job Title": job.title || "",
-      "Company": job.company || "",
+     "Job Title": job.source === "LinkedIn Post" && job.extractedRole
+      ? `${job.extractedRole} (via ${job.title})`
+      : job.title || "",
+      "Company": job.source === "LinkedIn Post" && job.extractedCompany
+      ? job.extractedCompany
+      : job.company || "",
       "Location": job.location || "",
       "Score": job.score || 0,
       "Label": job.label || "Unscored",
@@ -55,7 +59,9 @@ async function saveAllJobs(jobs) {
   const existing = await getExistingURLs();
   console.log(`Airtable: ${existing.size} jobs already in database`);
 
-  const newJobs = jobs.filter((job) => job.url && !existing.has(job.url));
+  const newJobs = jobs.filter((job) =>
+  job.url && !existing.has(job.url) && job.score > 10
+);
   console.log(`Airtable: ${newJobs.length} new jobs to save`);
 
   // Save in sequence to avoid Airtable rate limits (5 writes/sec)

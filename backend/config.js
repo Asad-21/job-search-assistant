@@ -18,13 +18,12 @@ const config = {
   ],
 
   // ── LinkedIn Posts keywords ───────────────────────────────────────────────
-  postKeywords: [
-    "hiring Entrepreneur in Residence India",
-    "Founder Office hiring India",
-    "GTM lead hiring India",
-    "Chief of Staff hiring startup India",
-    "looking for Founder's Office Associate",
-  ],
+postKeywords: [
+  "hiring founder office India",
+  "hiring EIR startup India",
+  "hiring chief of staff startup India",
+  "hiring Strategy & Operations India",
+],
 
   // ── Location preference ───────────────────────────────────────────────────
   preferredLocations: ["Bangalore", "Remote", "India","Gurgaon","Delhi/NCR"],
@@ -65,6 +64,19 @@ const config = {
       description:
         "Does the JD mention  AI-native, CRM, Salesforce, n8n, SQL, GTM tooling, or growth experimentation? Bonus for any mention of AI-powered operations.",
     },
+    filterSignals: {
+      deprioritise: [
+    "intern",
+    "internship", 
+    "fresher",
+    "0-1 years",
+    "10+ years",
+    "12+ years",
+    "15+ years",
+    "VP of",
+    "Director of",
+  ],
+}
   },
 
   // ── Keywords that boost a job's relevance during scoring ─────────────────
@@ -95,7 +107,7 @@ const config = {
     Previous: Associate at YCP India (strategy consulting) for 3 years.
     Key experience: GTM strategy, RevOps, CRM marketing, Salesforce, n8n automation,
     account management, product-led growth, financial modelling, and operations.
-    Seeking: EIR, Founder's Office, GTM Lead, RevOps, or Growth roles at
+    Seeking: EIR, Cheif of Staff, Founder's Office, GTM Lead, RevOps, or Growth roles at
     Series B/C AI-first or SaaS startups in India. Strong preference for roles
     with direct founder access, business ownership, and high strategic impact.
   `,

@@ -109,18 +109,25 @@ async function fetchLinkedInJobs() {
 
   for (const query of config.searchQueries) {
     try {
+      let jobIds = [];
+for (const start of [0, 25, 50]) {
       const searchUrl =
         `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search` +
-        `?keywords=${encodeURIComponent(query)}&location=India&start=0&sortBy=R`;
+        `?keywords=${encodeURIComponent(query)}&location=India&start=${start}&sortBy=R`;
 
       const searchRes = await axios.get(searchUrl, { headers });
+      const matches = searchRes.data.match(/data-entity-urn="[^"]*:(\d+)"/g) || [];
+      const ids = matches
+       .map((m) => m.match(/(\d+)"/)?.[1])
+        .filter(Boolean);
 
-      const jobIdMatches =
-        searchRes.data.match(/data-entity-urn="[^"]*:(\d+)"/g) || [];
-      const jobIds = jobIdMatches
-        .map((m) => m.match(/(\d+)"/)?.[1])
-        .filter(Boolean)
-        .slice(0, 25);
+      jobIds = [...jobIds, ...ids];
+      if (ids.length === 0) break; // no more results, stop paginating
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    // Deduplicate IDs within this query
+    jobIds = [...new Set(jobIds)].slice(0, 75);
 
       for (const jobId of jobIds) {
         try {
@@ -195,7 +202,7 @@ async function fetchLinkedInPosts() {
         {
           searchQueries: [keyword],
           maxPosts: 20,
-          sortBy: "date_posted",
+          sortBy: "date",
           scrapeReactions: false,
           scrapeComments: false,
         }
@@ -220,18 +227,32 @@ async function fetchLinkedInPosts() {
       );
 
       const posts = resultsRes.data.map((post) => ({
-        title: `Post by ${post.author?.name || "Unknown"}: ${post.content?.slice(0, 60) || ""}...`,
-        company: post.author?.info || "LinkedIn Post",
-        location: "LinkedIn",
-        description: post.content?.slice(0, 1500) || "",
-        url: post.linkedinUrl || "",
-        source: "LinkedIn Post",
-      }));
+      title: post.author?.name
+        ? `${post.author.name} — LinkedIn Post`
+        : "LinkedIn Post",
+      company: post.author?.info
+        ? post.author.info.split("|")[0].split("@")[0].trim().slice(0, 80)
+        : "LinkedIn",
+      location: post.content?.toLowerCase().includes("remote") ? "Remote"
+        : post.content?.toLowerCase().includes("bangalore") || 
+          post.content?.toLowerCase().includes("bengaluru") ? "Bangalore"
+        : post.content?.toLowerCase().includes("delhi") || 
+          post.content?.toLowerCase().includes("gurugram") ||
+          post.content?.toLowerCase().includes("gurgaon") ? "Delhi NCR"
+        : post.content?.toLowerCase().includes("mumbai") ? "Mumbai"
+        : "Location unclear",
+      description: post.content?.slice(0, 1500) || "",
+      url: post.linkedinUrl || "",
+      source: "LinkedIn Post",
+    }));
 
       allPosts = [...allPosts, ...posts];
       console.log(`Apify: "${keyword}" → ${posts.length} posts`);
     } catch (err) {
       console.error(`Apify error for "${keyword}":`, err.message);
+      if (err.response) {
+        console.error("Apify response data:", JSON.stringify(err.response.data));
+      }
     }
   }
 
@@ -257,13 +278,87 @@ async function fetchAllJobs() {
     ...linkedInPosts,
   ];
 
-  // Deduplicate by URL
+  // Filter out spam aggregator accounts and low quality posts
+    const filtered = allJobs.filter((job) => {
+      if (job.source !== "LinkedIn Post") return true;
+
+      const spamAccounts = [
+        "jobs, india",
+        "jobs india", 
+        "uttarakhand jobs",
+        "bihar jobs",
+        "punjab jobs",
+        "maharashtra jobs",
+        "kerala jobs",
+        "karnataka jobs",
+        "gujarat jobs",
+        "haryana jobs",
+        "andhra pradesh jobs",
+        "tamil nadu jobs",
+        "madhya pradesh jobs",
+        "jharkhand jobs",
+        "chattisgarh jobs",
+        "uttar pradesh jobs",
+        "west bengal jobs",
+      ];
+
+  const titleLower = job.title.toLowerCase();
+  const isSpam = spamAccounts.some((account) =>
+    titleLower.includes(account)
+  );
+
+  return !isSpam;
+});
+  // Hard filter — remove internships and clearly irrelevant roles before scoring
+    const preFiltered = filtered.filter((job) => {
+      const title = job.title.toLowerCase();
+      const skipIfContains = [
+        "intern", "internship", "trainee", "fresher",
+      "food experience", "chef", "professor", "bim modeller",
+      "bim manager", "chief engineer", "social media manager",
+      "dth", "r&d", "zonal sales", "supply chain",
+      "production planning", "telecom", "voice core",
+      "field crops", "cloud support engineer", "hr manager",
+      "human resources manager", "marketing communications",
+     "category manager", "territory manager", "area head",
+      "sr. manager -supply", "business analyst general insurance"
+      ];
+      return !skipIfContains.some((word) => title.includes(word));
+    });  
+    // Location filter — keep if location matches preference OR is unspecified
+    const locationFiltered = preFiltered.filter((job) => {
+      const loc = (job.location + " " + job.description)
+        .toLowerCase();
+
+      // Always reject if explicitly mentions unwanted locations
+      const isRejected = config.locationConfig.rejectIfMentioned
+        .some((l) => loc.includes(l));
+      if (isRejected) return false;
+
+      // Always keep if location is unclear or not mentioned
+      if (!job.location || 
+          job.location === "Location unclear" || 
+          job.location === "Unknown Location" ||
+          job.location === "LinkedIn") return true;
+
+      // Keep if any preferred location matches
+      const isPreferred = config.locationConfig.preferred
+        .some((l) => loc.includes(l));
+
+      return isPreferred;
+    });
+  // Deduplicate
   const seen = new Set();
-  const unique = allJobs.filter((job) => {
-    if (!job.url || seen.has(job.url)) return false;
-    seen.add(job.url);
-    return true;
-  });
+    const unique = locationFiltered.filter((job) => {
+      // Normalise title and company for matching
+      const title = job.title.toLowerCase().trim();
+      const company = job.company.toLowerCase().trim();
+      const key = `${title}__${company}`;
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
   console.log(`─── Total: ${unique.length} unique jobs fetched ───`);
   return unique;
