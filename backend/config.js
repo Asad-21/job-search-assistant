@@ -18,19 +18,27 @@ const config = {
   ],
 
   // ── LinkedIn Posts keywords ───────────────────────────────────────────────
-postKeywords: [
-  "hiring founder office India",
-  "hiring EIR startup India",
-  "hiring chief of staff startup India",
-  "hiring Strategy & Operations India",
-],
+  postKeywords: [
+    "hiring founder office India",
+    "hiring EIR startup India",
+    "hiring chief of staff startup India",
+    "hiring Strategy & Operations India",
+  ],
 
-  // ── Location preference ───────────────────────────────────────────────────
-  preferredLocations: ["Bangalore", "Remote", "India","Gurgaon","Delhi/NCR"],
+  // ── Location config ───────────────────────────────────────────────────────
+  locationConfig: {
+    preferred: [
+      "bangalore", "bengaluru", "delhi", "ncr",
+      "gurgaon", "gurugram", "mumbai", "remote",
+      "pan india", "pan-india", "anywhere", "hybrid",
+    ],
+    rejectIfMentioned: [
+      "dubai", "singapore", "london", "new york",
+      "us only", "uae", "germany", "australia",
+    ],
+  },
 
   // ── Adzuna settings ───────────────────────────────────────────────────────
-  // 8 queries × 50 results × 1 page = up to 400 raw jobs per run
-  // Uses only ~8 API calls per run → safe within free tier (2500/month)
   adzuna: {
     resultsPerPage: 50,
     pages: 1,
@@ -62,25 +70,18 @@ postKeywords: [
     toolsAndSkillMatch: {
       weight: 10,
       description:
-        "Does the JD mention  AI-native, CRM, Salesforce, n8n, SQL, GTM tooling, or growth experimentation? Bonus for any mention of AI-powered operations.",
+        "Does the JD mention AI-native, CRM, Salesforce, n8n, SQL, GTM tooling, or growth experimentation? Bonus for any mention of AI-powered operations.",
     },
-    filterSignals: {
-      deprioritise: [
-    "intern",
-    "internship", 
-    "fresher",
-    "0-1 years",
-    "10+ years",
-    "12+ years",
-    "15+ years",
-    "VP of",
-    "Director of",
-  ],
-}
   },
 
-  // ── Keywords that boost a job's relevance during scoring ─────────────────
-  // Claude treats these as positive signals in the JD.
+  // ── Keywords that signal deprioritisation ─────────────────────────────────
+  deprioritiseSignals: [
+    "intern", "internship", "fresher",
+    "0-1 years", "10+ years", "12+ years", "15+ years",
+    "VP of", "Director of",
+  ],
+
+  // ── Keywords that boost a job's relevance during scoring ──────────────────
   boostKeywords: [
     "0 to 1",
     "zero to one",
@@ -100,14 +101,14 @@ postKeywords: [
     "cross-functional",
   ],
 
-  // ── Candidate profile (passed to Claude for personalised scoring) ─────────
+  // ── Candidate profile (passed to Claude for personalised scoring) ──────────
   candidateProfile: `
     Asad Mansuri — IIT Bombay Chemical Engineering graduate (2021).
     Currently at Loop Health in the Founder's Office, working on Growth and GTM strategy.
     Previous: Associate at YCP India (strategy consulting) for 3 years.
     Key experience: GTM strategy, RevOps, CRM marketing, Salesforce, n8n automation,
     account management, product-led growth, financial modelling, and operations.
-    Seeking: EIR, Cheif of Staff, Founder's Office, GTM Lead, RevOps, or Growth roles at
+    Seeking: EIR, Chief of Staff, Founder's Office, GTM Lead, RevOps, or Growth roles at
     Series B/C AI-first or SaaS startups in India. Strong preference for roles
     with direct founder access, business ownership, and high strategic impact.
   `,
