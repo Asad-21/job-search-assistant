@@ -48,29 +48,30 @@ app.post("/run", async (req, res) => {
     console.log(`Fetched ${rawJobs.length} raw jobs`);
 
     //Step 2: Score
-   // const scoredJobs = await scoreAllJobs(rawJobs);
-    //console.log(`Scored ${scoredJobs.length} jobs`);
+    const scoredJobs = await scoreAllJobs(rawJobs);
+    console.log(`Scored ${scoredJobs.length} jobs`);
 
     // Step 3: Save
-    //const saved = await saveAllJobs(scoredJobs);
-    //console.log(`Saved ${saved} new jobs to Airtable`);
+    const saved = await saveAllJobs(scoredJobs);
+    console.log(`Saved ${saved} new jobs to Airtable`);
 
     console.log("=== Pipeline run complete ===");
 
     res.json({
-      success: true,
-      fetched: rawJobs.length,
-      scored: scoredJobs.length,
-      saved,
-      topJob: scoredJobs[0]
-        ? {
-            title: scoredJobs[0].title,
-            company: scoredJobs[0].company,
-            score: scoredJobs[0].score,
-            label: scoredJobs[0].label,
-          }
-        : null,
-    });
+  success: true,
+  fetched: rawJobs.length,
+  scored: scoredJobs.length,
+  saved,
+  topJob: scoredJobs[0]
+    ? {
+        title: scoredJobs[0].title,
+        company: scoredJobs[0].company,
+        score: scoredJobs[0].score,
+        label: scoredJobs[0].label,
+      }
+    : null,
+});
+
   } catch (err) {
     console.error("/run error:", err.message);
     res.status(500).json({ success: false, error: err.message });
