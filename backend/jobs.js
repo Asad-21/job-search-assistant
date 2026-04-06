@@ -81,6 +81,7 @@ async function fetchJSearchJobs() {
         description: job.job_description?.slice(0, 1500) || "",
         url: job.job_apply_link || job.job_google_link || "",
         source: "JSearch",
+        postedAt: job.job_posted_at_datetime_utc || null,
       }));
 
       allJobs = [...allJobs, ...jobs];
@@ -156,6 +157,9 @@ async function fetchLinkedInJobs() {
               ?.replace(/<[^>]+>/g, " ")
               .trim() || "";
 
+          const postedAt =
+            html.match(/<time[^>]*datetime="([^"]+)"[^>]*>/)?.[1] || null;
+              
           allJobs.push({
             title,
             company,
@@ -163,6 +167,7 @@ async function fetchLinkedInJobs() {
             description: description.slice(0, 1500),
             url: `https://www.linkedin.com/jobs/view/${jobId}`,
             source: "LinkedIn",
+            postedAt,
           });
 
           await new Promise((r) => setTimeout(r, 500));
@@ -234,6 +239,7 @@ async function fetchLinkedInPosts() {
         description: post.content?.slice(0, 1500) || "",
         url: post.linkedinUrl || "",
         source: "LinkedIn Post",
+        postedAt: post.date || post.postedAt || null,
       }));
 
       allPosts = [...allPosts, ...posts];

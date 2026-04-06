@@ -312,6 +312,19 @@ export default function App() {
   );
 }
 
+// Helper function for timeAgo
+
+function timeAgo(dateStr) {
+  if (!dateStr) return null;
+  const days = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+  if (days === 0) return "today";
+  if (days === 1) return "1 day ago";
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+
 // ── Job Card ──────────────────────────────────────────────────────────────
 
 function JobCard({ job, expanded, onToggle, onStatus, onEmail }) {
@@ -346,6 +359,12 @@ function JobCard({ job, expanded, onToggle, onStatus, onEmail }) {
           <div className="card__company">{job.company}</div>
           <div className="card__meta">
             <span>{job.location}</span>
+            {job.postedAt && (
+             <>
+            <span className="card__dot">·</span>
+            <span className="card__source">{timeAgo(job.postedAt)}</span>
+            </>
+            )}
             <span className="card__dot">·</span>
             <span className="card__source">{job.source}</span>
           </div>
