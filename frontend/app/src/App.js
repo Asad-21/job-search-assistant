@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./App.css";
 
-const API = "http://localhost:3001";
+const API = "https://job-search-assistant-backend-h03h.onrender.com";
 
 const LABEL_COLORS = {
   "Strong Match": { bg: "#0a2a1a", border: "#00ff87", text: "#00ff87" },
