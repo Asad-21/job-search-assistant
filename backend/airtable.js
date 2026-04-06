@@ -174,4 +174,44 @@ async function updateJobStatus(recordId, status) {
   }
 }
 
-module.exports = { saveAllJobs, getAllJobs, updateJobStatus };
+// ─── Cleanup — delete records older than 14 days ───────────────────────────
+
+async function cleanupOldJobs() {
+  const table = getTable();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const cutoffStr = cutoff.toISOString().split("T")[0];
+
+  console.log(`Airtable cleanup: removing jobs added before ${cutoffStr}`);
+
+  const toDelete = [];
+
+  try {
+    await table
+      .select({ fields: ["Date Added"] })
+      .eachPage((records, fetchNextPage) => {
+        records.forEach((r) => {
+          const dateAdded = r.get("Date Added");
+          if (dateAdded && dateAdded < cutoffStr) {
+            toDelete.push(r.id);
+          }
+        });
+        fetchNextPage();
+      });
+
+    // Airtable delete accepts max 10 records per call
+    for (let i = 0; i < toDelete.length; i += 10) {
+      const batch = toDelete.slice(i, i + 10);
+      await table.destroy(batch);
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    console.log(`Airtable cleanup: deleted ${toDelete.length} old records`);
+    return toDelete.length;
+  } catch (err) {
+    console.error("Airtable cleanup error:", err.message);
+    return 0;
+  }
+}
+
+module.exports = { saveAllJobs, getAllJobs, updateJobStatus, cleanupOldJobs };

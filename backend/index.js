@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const { fetchAllJobs } = require("./jobs");
 const { scoreAllJobs } = require("./scorer");
-const { saveAllJobs, getAllJobs, updateJobStatus } = require("./airtable");
+const { saveAllJobs, getAllJobs, updateJobStatus, cleanupOldJobs } = require("./airtable");
 const { findDecisionMaker } = require("./hunter");
 const { sendOutreachEmail, previewEmail } = require("./gmail");
 
@@ -42,6 +42,10 @@ app.get("/jobs", async (req, res) => {
 app.post("/run", async (req, res) => {
   try {
     console.log("=== Pipeline run started ===");
+
+     // Step 0: Cleanup old records
+    const cleaned = await cleanupOldJobs();
+    console.log(`Cleaned up ${cleaned} old records`);
 
     // Step 1: Fetch
     const rawJobs = await fetchAllJobs();
