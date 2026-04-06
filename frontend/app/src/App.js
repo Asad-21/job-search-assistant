@@ -35,8 +35,7 @@ export default function App() {
   const [sending, setSending]         = useState(false);
   const [toast, setToast]             = useState(null);
 
-  useEffect(() => { loadJobs(); }, []);
-
+  useEffect(() => { loadJobs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   function showToast(msg, type = "success") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
