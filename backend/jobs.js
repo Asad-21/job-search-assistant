@@ -157,8 +157,10 @@ async function fetchLinkedInJobs() {
               ?.replace(/<[^>]+>/g, " ")
               .trim() || "";
 
-          const postedAt =
-            html.match(/<time[^>]*datetime="([^"]+)"[^>]*>/)?.[1] || null;
+          const postedAtRaw = html.match(/<time[^>]*datetime="([^"]+)"[^>]*>/)?.[1] || null;
+          
+          
+          const postedAt = postedAtRaw ;
               
           allJobs.push({
             title,
@@ -239,7 +241,8 @@ async function fetchLinkedInPosts() {
         description: post.content?.slice(0, 1500) || "",
         url: post.linkedinUrl || "",
         source: "LinkedIn Post",
-        postedAt: post.date || post.postedAt || null,
+        postedAt: post.date ? (typeof post.date === 'object' ? post.date.date : post.date)
+  : post.postedAt || null,
       }));
 
       allPosts = [...allPosts, ...posts];

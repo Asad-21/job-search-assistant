@@ -38,7 +38,7 @@ async function saveJob(job) {
       "Impact & Ownership": job.breakdown?.impactAndOwnership || 0,
       "Location Fit": job.breakdown?.locationFit || 0,
       "Tools Match": job.breakdown?.toolsAndSkillMatch || 0,
-      "Posted At": job.postedAt || "",
+      "Posted At": job.postedAt ? new Date(job.postedAt).toISOString().split("T")[0] : null,
     });
 
     console.log(`Airtable: saved "${job.title}" at ${job.company} (${job.score}/100)`);
