@@ -28,20 +28,24 @@ Best,<br>
 // ─── Initialise Gmail transporter (module-level, reused across calls) ──────
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
 });
 
 // Verify credentials on startup
 transporter.verify((error) => {
   if (error) {
-    console.error("Gmail transporter error:", error.message);
+    console.error("Gmail error code:", error.code);
+    console.error("Gmail error command:", error.command);
+    console.error("Gmail error message:", error.message);
   } else {
     console.log("Gmail ready to send");
   }
