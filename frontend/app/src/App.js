@@ -122,7 +122,8 @@ export default function App() {
       const res = await axios.post(`${API}/jobs/${emailModal.job.id}/send-email`, {
         job: emailModal.job,
         recipientEmail: recipient,
-      });
+      },{ timeout: 60000 }
+    );
       if (res.data.success) {
         showToast("Email sent!");
         setJobs((prev) =>

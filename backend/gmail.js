@@ -25,17 +25,27 @@ Best,<br>
 <a href="${CANDIDATE.cv}" style="color:#0a66c2;text-decoration:none;">Resume</a>
 `;
 
-// ─── Initialise Gmail transporter ─────────────────────────────────────────
+// ─── Initialise Gmail transporter (module-level, reused across calls) ──────
 
-function getTransporter() {
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
-}
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+});
+
+// Verify credentials on startup
+transporter.verify((error) => {
+  if (error) {
+    console.error("Gmail transporter error:", error.message);
+  } else {
+    console.log("Gmail ready to send");
+  }
+});
 
 // ─── Generate email using Claude ──────────────────────────────────────────
 
@@ -113,8 +123,6 @@ function stripSignoff(body) {
 // ─── Send outreach email ───────────────────────────────────────────────────
 
 async function sendOutreachEmail(job, recipientEmail) {
-  const transporter = getTransporter();
-
   console.log(`Generating email for "${job.title}" at ${job.company}...`);
   const email = await generateEmail(job);
 
