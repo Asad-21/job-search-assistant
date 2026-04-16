@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer");
+const { google } = require("googleapis");
 const Anthropic = require("@anthropic-ai/sdk");
 const config = require("./config");
 
@@ -25,31 +25,53 @@ Best,<br>
 <a href="${CANDIDATE.cv}" style="color:#0a66c2;text-decoration:none;">Resume</a>
 `;
 
-// ─── Initialise Gmail transporter (module-level, reused across calls) ──────
+// ─── Gmail OAuth2 client ───────────────────────────────────────────────────
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-});
+function getGmailClient() {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    "https://developers.google.com/oauthplayground"
+  );
 
-// Verify credentials on startup
-transporter.verify((error) => {
-  if (error) {
-    console.error("Gmail error code:", error.code);
-    console.error("Gmail error command:", error.command);
-    console.error("Gmail error message:", error.message);
-  } else {
-    console.log("Gmail ready to send");
-  }
-});
+  oauth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+  });
+
+  return google.gmail({ version: "v1", auth: oauth2Client });
+}
+
+// ─── Build raw email (RFC 2822 format) ────────────────────────────────────
+
+function buildRawEmail({ from, to, subject, textBody, htmlBody }) {
+  const boundary = "boundary_" + Date.now();
+
+  const raw = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset=UTF-8`,
+    ``,
+    textBody,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    `<html><body>${htmlBody.replace(/\n/g, "<br/>")}</body></html>`,
+    ``,
+    `--${boundary}--`,
+  ].join("\r\n");
+
+  return Buffer.from(raw)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
 // ─── Generate email using Claude ──────────────────────────────────────────
 
@@ -129,26 +151,33 @@ function stripSignoff(body) {
 async function sendOutreachEmail(job, recipientEmail) {
   console.log(`Generating email for "${job.title}" at ${job.company}...`);
   const email = await generateEmail(job);
-
   const cleanBody = stripSignoff(email.body);
 
-  const mailOptions = {
+  const textBody = cleanBody + "\n\n" + signaturePlain;
+  const htmlBody = cleanBody + signatureHtml;
+
+  const rawEmail = buildRawEmail({
     from: `Asad Mansuri <${process.env.GMAIL_USER}>`,
     to: recipientEmail,
     subject: email.subject,
-    text: cleanBody + "\n\n" + signaturePlain,
-    html: cleanBody.replace(/\n/g, "<br/>") + signatureHtml,
-  };
+    textBody,
+    htmlBody,
+  });
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${recipientEmail}: ${info.messageId}`);
+    const gmail = getGmailClient();
+    const res = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: { raw: rawEmail },
+    });
+
+    console.log(`Email sent to ${recipientEmail}: ${res.data.id}`);
 
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: res.data.id,
       subject: email.subject,
-      body: cleanBody + "\n\n" + signaturePlain,
+      body: textBody,
       sentTo: recipientEmail,
       sentAt: new Date().toISOString(),
     };
@@ -166,7 +195,6 @@ async function sendOutreachEmail(job, recipientEmail) {
 async function previewEmail(job) {
   console.log(`Previewing email for "${job.title}" at ${job.company}...`);
   const email = await generateEmail(job);
-
   const cleanBody = stripSignoff(email.body);
 
   const previewSignature = `Best,\nAsad Mansuri\nLinkedIn | M: ${CANDIDATE.phone}\nResume: ${CANDIDATE.cv}`;
