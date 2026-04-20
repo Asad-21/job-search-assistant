@@ -22,9 +22,10 @@ const ACTION_COLORS = {
 
 const STATUS_OPTIONS = ["Saved", "Applied", "Skipped"];
 
-const [statusFilter, setStatusFilter] = useState("All");
+
 
 export default function App() {
+  const [statusFilter, setStatusFilter] = useState("All");
   const [jobs, setJobs]               = useState([]);
   const [loading, setLoading]         = useState(true);
   const [running, setRunning]         = useState(false);
