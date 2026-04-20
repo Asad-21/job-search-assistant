@@ -22,6 +22,8 @@ const ACTION_COLORS = {
 
 const STATUS_OPTIONS = ["Saved", "Applied", "Skipped"];
 
+const [statusFilter, setStatusFilter] = useState("All");
+
 export default function App() {
   const [jobs, setJobs]               = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -143,9 +145,11 @@ export default function App() {
   const sources = ["All", ...new Set(jobs.map((j) => j.source).filter(Boolean))];
 
   const filtered = jobs.filter((j) => {
-    const byLabel  = filter === "All"       || j.label  === filter;
-    const bySource = sourceFilter === "All" || j.source === sourceFilter;
-    return byLabel && bySource;
+  const byLabel  = filter === "All"        || j.label  === filter;
+  const bySource = sourceFilter === "All"  || j.source === sourceFilter;
+  const byStatus = statusFilter === "All"  || 
+                   (statusFilter === "New" ? (!j.status || j.status === "Saved") : j.status === statusFilter);
+  return byLabel && bySource && byStatus;
   });
 
   return (
@@ -207,6 +211,17 @@ export default function App() {
             </button>
           ))}
         </div>
+        <div className="filters__group">
+        {["All", "New", "Applied", "Saved", "Skipped"].map((s) => (
+        <button
+          key={s}
+          className={`filter-btn ${statusFilter === s ? "filter-btn--active" : ""}`}
+          onClick={() => setStatusFilter(s)}
+          >
+        {s}
+        </button>
+        ))}
+      </div>
       </div>
 
       {/* ── Jobs grid ── */}
